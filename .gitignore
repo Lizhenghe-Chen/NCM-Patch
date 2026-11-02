@@ -1,0 +1,27 @@
+# 虚拟环境与 Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# 本地运行状态
+ncm_web_settings.json
+
+# 平台噪音
+.DS_Store
+Thumbs.db
+
+# Windows 专用旧引擎（方案 A 已改为纯标准库，不再需要）
+ncmdump.exe
+
+# 测试与临时产物
+_test_out/
+_test_ref/
+_cross/
+_proc_test*/
+_web_test*/
+_probe_raw/
+
+# PyInstaller 打包产物
+build/
+dist/
