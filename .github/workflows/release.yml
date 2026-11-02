@@ -1,1 +1,101 @@
-PLACEHOLDER_RELEASE
+name: 多平台 Release 构建
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            python: '3.12'
+            artifact: ncm-patch-windows-x64.exe
+            py: python
+          - os: macos-latest
+            python: '3.12'
+            artifact: ncm-patch-macos-x64
+            py: python3
+          - os: ubuntu-latest
+            python: '3.12'
+            artifact: ncm-patch-linux-x64
+            py: python3
+            apt: python3-tk
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Tkinter（Linux）
+        if: matrix.apt
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.apt }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: 安装 PyInstaller
+        run: |
+          ${{ matrix.py }} -m pip install --upgrade pip
+          ${{ matrix.py }} -m pip install pyinstaller
+
+      - name: 构建单文件产物
+        run: |
+          ${{ matrix.py }} -m PyInstaller --noconfirm NCM转换台.spec
+
+      - name: 重命名产物
+        shell: bash
+        run: |
+          ls -la dist/
+          mv dist/NCM转换台 dist/${{ matrix.artifact }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: 列出产物
+        run: ls -laR artifacts/
+
+      - name: 发布 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: NCM-Patch v1.0.0
+          body: |
+            ## NCM-Patch v1.0.0
+
+            纯标准库 `.ncm` → `.flac` / `.mp3` 转换工具，零第三方依赖，自动回写封面与元数据。
+
+            ### 各平台下载
+
+            - **Windows**：`ncm-patch-windows-x64.exe`（双击运行）
+            - **macOS**：`ncm-patch-macos-x64`（`chmod +x` 后运行）
+            - **Linux**：`ncm-patch-linux-x64`（`chmod +x` 后运行）
+
+            ### 使用说明
+
+            1. 启动后自动打开浏览器访问 `http://127.0.0.1:8765/`
+            2. 选择 `.ncm` 所在目录（或直接拖入）
+            3. 点「扫描预览」→「开始转换」
+
+            转换产物为携带封面与元数据的标准 `.flac` / `.mp3` 文件。
+          files: artifacts/*
+          draft: false
+          prerelease: false

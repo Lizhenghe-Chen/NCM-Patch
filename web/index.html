@@ -1,1 +1,132 @@
-PLACEHOLDER_INDEX
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>NCM 转换台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <h1>NCM 转换台</h1>
+    </div>
+    <p class="engine" id="engine">正在连接…</p>
+  </header>
+
+  <main class="shell">
+    <section class="panel setup" aria-labelledby="setup-title">
+      <h2 id="setup-title">任务</h2>
+
+      <div class="field">
+        <label for="sourceRow">源目录</label>
+        <button class="pickrow" id="sourceRow" type="button">
+          <span class="path" id="sourcePath">未选择</span>
+          <span class="pickcta">选择…</span>
+        </button>
+        <p class="hint">点一下选择目录，或把文件夹 / .ncm 文件拖到上面</p>
+      </div>
+
+      <div class="field">
+        <label for="outputRow">输出目录</label>
+        <button class="pickrow" id="outputRow" type="button">
+          <span class="path" id="outputPath">与源目录相同</span>
+          <span class="pickcta">选择…</span>
+        </button>
+        <p class="hint">留空则与源目录相同。跳过判断以输出目录为准：库里已有同名 .flac / .mp3 的歌不会再转。</p>
+        <p class="field-actions"><button class="linkbtn" id="outputSame" type="button">改用与源目录相同</button></p>
+      </div>
+
+      <div class="pair">
+        <div class="field">
+          <label for="jobs">并发数</label>
+          <input id="jobs" type="number" min="1" max="16" step="1" inputmode="numeric" value="4">
+        </div>
+        <div class="field">
+          <label for="remove">源文件</label>
+          <label class="check">
+            <input id="remove" type="checkbox">
+            <span>成功后删除 .ncm</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="scan" class="btn" type="button">扫描预览</button>
+        <button id="start" class="btn primary" type="button" disabled>开始转换</button>
+        <button id="cancel" class="btn ghost" type="button" disabled>停止</button>
+      </div>
+
+      <p class="msg" id="msg" role="status" aria-live="polite"></p>
+
+      <p class="foot">推荐：源目录只放 .ncm、输出目录指向音乐库，就不必勾「删除源文件」，转换产物不会在源目录堆积。任务在服务端后台运行，关掉网页不会中断。</p>
+    </section>
+
+    <section class="panel live" aria-labelledby="live-title">
+      <div class="live-head">
+        <h2 id="live-title">进度</h2>
+        <span class="tag" id="stateTag" data-state="idle">空闲</span>
+      </div>
+
+      <dl class="metrics">
+        <div>
+          <dt>待转换</dt>
+          <dd id="mPending">—</dd>
+        </div>
+        <div>
+          <dt>成功</dt>
+          <dd id="mConverted">—</dd>
+        </div>
+        <div>
+          <dt>失败</dt>
+          <dd id="mFailed">—</dd>
+        </div>
+        <div>
+          <dt>跳过</dt>
+          <dd id="mSkipped">—</dd>
+        </div>
+      </dl>
+
+      <div class="bar" id="bar" role="progressbar" aria-label="转换进度" aria-valuemin="0" aria-valuemax="100"
+        aria-valuenow="0">
+        <span id="barFill"></span>
+      </div>
+      <div class="bar-meta">
+        <span id="barText">尚未开始</span>
+        <span id="elapsed"></span>
+      </div>
+
+      <h3 class="log-title">日志</h3>
+      <div class="log" id="log">
+        <p class="empty"><strong>还没有扫描。</strong>先填好目录，点「扫描预览」看清这一轮要转多少个，再「开始转换」。</p>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal" id="browser" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="browserTitle">
+      <div class="modal-head">
+        <h3 id="browserTitle">选择目录</h3>
+        <button class="iconbtn" id="browserClose" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="crumbs" id="browserCrumbs"></div>
+      <ul class="dirlist" id="browserList"></ul>
+      <p class="modal-msg" id="browserMsg"></p>
+      <div class="modal-foot">
+        <span class="modal-path" id="browserPath">此电脑</span>
+        <div class="modal-actions">
+          <button class="btn" id="browserCancel" type="button">取消</button>
+          <button class="btn primary" id="browserChoose" type="button" disabled>选定此文件夹</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
