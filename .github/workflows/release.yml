@@ -1,101 +1,97 @@
-name: 多平台 Release 构建
+name: build-release
 
 on:
   push:
     branches: [main]
     tags: ['v*']
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
-            python: '3.12'
             artifact: ncm-patch-windows-x64.exe
-            py: python
+            python: '3.12'
           - os: macos-latest
-            python: '3.12'
             artifact: ncm-patch-macos-x64
-            py: python3
-          - os: ubuntu-latest
             python: '3.12'
+          - os: ubuntu-latest
             artifact: ncm-patch-linux-x64
-            py: python3
-            apt: python3-tk
-
+            python: 'system'
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: 安装 Tkinter（Linux）
-        if: matrix.apt
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ${{ matrix.apt }}
-
-      - uses: actions/setup-python@v5
+      - name: Set up Python (Windows / macOS)
+        if: matrix.python != 'system'
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
 
-      - name: 安装 PyInstaller
-        run: |
-          ${{ matrix.py }} -m pip install --upgrade pip
-          ${{ matrix.py }} -m pip install pyinstaller
+      - name: Install Tkinter (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y python3-tk
 
-      - name: 构建单文件产物
-        run: |
-          ${{ matrix.py }} -m PyInstaller --noconfirm NCM转换台.spec
-
-      - name: 重命名产物
+      - name: Build with PyInstaller
         shell: bash
         run: |
+          if [ "${{ matrix.python }}" = "system" ]; then PY=python3; else PY=python; fi
+          $PY -m pip install --quiet pyinstaller
+          $PY -m PyInstaller NCM转换台.spec
           ls -la dist/
-          mv dist/NCM转换台 dist/${{ matrix.artifact }}
 
-      - uses: actions/upload-artifact@v4
+      - name: Stage artifact
+        shell: bash
+        run: |
+          if [ -f "dist/NCM转换台.exe" ]; then SRC="dist/NCM转换台.exe"; else SRC="dist/NCM转换台"; fi
+          mkdir -p "$RUNNER_TEMP/artifacts"
+          cp "$SRC" "$RUNNER_TEMP/artifacts/${{ matrix.artifact }}"
+          ls -la "$RUNNER_TEMP/artifacts/"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: dist/${{ matrix.artifact }}
+          name: build-${{ matrix.os }}
+          path: ${{ runner.temp }}/artifacts/*
+          if-no-files-found: error
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          path: release-assets
           merge-multiple: true
 
-      - name: 列出产物
-        run: ls -laR artifacts/
-
-      - name: 发布 Release
+      - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: NCM-Patch v1.0.0
+          update_release: true
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }}
           body: |
-            ## NCM-Patch v1.0.0
+            NCM 转换台 —— 网易云音乐 .ncm 批量转换工具（零第三方依赖，纯标准库解密引擎）。
 
-            纯标准库 `.ncm` → `.flac` / `.mp3` 转换工具，零第三方依赖，自动回写封面与元数据。
+            ## 各平台包
+            - `ncm-patch-windows-x64.exe` — Windows 单文件，双击即用
+            - `ncm-patch-macos-x64` — macOS 可执行文件（终端运行：`chmod +x` 后执行）
+            - `ncm-patch-linux-x64` — Linux 可执行文件（终端运行：`chmod +x` 后执行）
+            - Source code — 源码包（任意平台 `python ncm_web.py` 运行，需 Python 3.8+）
 
-            ### 各平台下载
+            ## 使用
+            Windows 双击 exe 自动打开浏览器界面；macOS/Linux 在终端 `./ncm-patch-*` 运行后访问 `http://127.0.0.1:8765/`。
+            命令行：`python ncm_flac_processor.py 源目录 -o 输出目录`（源码方式）。
 
-            - **Windows**：`ncm-patch-windows-x64.exe`（双击运行）
-            - **macOS**：`ncm-patch-macos-x64`（`chmod +x` 后运行）
-            - **Linux**：`ncm-patch-linux-x64`（`chmod +x` 后运行）
-
-            ### 使用说明
-
-            1. 启动后自动打开浏览器访问 `http://127.0.0.1:8765/`
-            2. 选择 `.ncm` 所在目录（或直接拖入）
-            3. 点「扫描预览」→「开始转换」
-
-            转换产物为携带封面与元数据的标准 `.flac` / `.mp3` 文件。
-          files: artifacts/*
-          draft: false
-          prerelease: false
+            完整说明见 README。
+          files: release-assets/*
